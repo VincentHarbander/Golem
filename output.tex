@@ -1,0 +1,37 @@
+\documentclass{article}
+
+% This is a cool comment that is also within a do-block!
+
+\usepackage{amsmath}\usepackage{graphicx}\usepackage{float}
+
+\title{First document}
+
+\author{Vincent Harbander}
+
+\date{September 2025}
+
+\begin{document}
+\maketitle
+
+Lorem ipsum. Let $x = 0$. Look at this cool equation! I call it equation \ref{coolio}.
+
+\begin{equation}
+(x + 1) + 0 = x + (1 + 0) = x + 1
+\label{coolio}
+\end{equation}
+
+Wow! This is even more text. I could write about whatever here.
+
+This is a new paragraph following the previous one! Check out the stuff below!
+
+\begin{align}
+\begin{split}
+x = x \\
+x < y < z
+\end{split}
+\end{align}
+
+\begin{figure}[H]
+\centering\includegraphics[scale=0.1]{apple.png}
+\end{figure}
+\end{document}
