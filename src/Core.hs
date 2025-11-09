@@ -11,8 +11,8 @@ module Core (
   MathTextT,
   MathText,
   MathText',
-  Document,
-  unDocument,
+  Document(..),
+  TextPack,
   fromTextM,
   fromText,
   textM,
@@ -31,16 +31,6 @@ module Core (
   mscopeWith,
   mscopeM,
   mscope,
-  equationM,
-  equation,
-  equationM',
-  equation',
-  labelM,
-  label,
-  refM,
-  ref,
-  commentM,
-  comment,
   putBetween,
   (.>),
   (?>),
@@ -58,18 +48,10 @@ module Core (
   command,
   mcommandM,
   mcommand,
-  usepackageM,
-  usepackage,
   cast,
   GolemText (..),
   compile,
-  compileWith,
-  stdout,
-  stdoutWith,
-  splitM,
-  split,
-  figureM,
-  figure,
+  compileWith
 ) where
 
 import Control.Applicative (liftA2)
@@ -308,42 +290,6 @@ mscopeM scopeName t = scopeM scopeName (cast t)
 mscope :: (Applicative m) => Text -> MathTextT m () -> NormalTextT m ()
 mscope = mscopeM
 
-equationM :: (Monoid a, Applicative m) => MathTextT m a -> NormalTextT m a
-equationM = mscopeM "equation"
-
-equation :: (Applicative m) => MathTextT m () -> NormalTextT m ()
-equation = equationM
-
-equationM' :: (Monoid a, Applicative m) => MathTextT m a -> NormalTextT m a
-equationM' = mscopeM "equation*"
-
-equation' :: (Applicative m) => MathTextT m () -> NormalTextT m ()
-equation' = equationM'
-
-labelM :: (Monoid a, Monad m, TextPack t m) => Text -> t m a
-labelM t = cast $ commandM "label" .> textM t
-
-label :: (Monad m, TextPack t m) => Text -> t m ()
-label = labelM
-
-refM :: (Monoid a, Monad m) => Text -> NormalTextT m a
-refM t = commandM "ref" .> textM t
-
-ref :: (Monad m) => Text -> NormalTextT m ()
-ref = refM
-
-commentM :: (Monoid a, Applicative m, TextPack t m) => Text -> t m a
-commentM t = fromTextM $ "% " <> t
-
-comment :: (Applicative m, TextPack t m) => Text -> t m ()
-comment = commentM
-
-usepackageM :: (Monoid a, Applicative m) => NormalTextT m a
-usepackageM = commandM "usepackage"
-
-usepackage :: (Applicative m) => NormalTextT m ()
-usepackage = usepackageM
-
 defaultArticleT ::
   (Monoid a, Monad m) =>
   Text ->
@@ -383,34 +329,3 @@ compileWith runner filepath mdoc = do
 
 compile :: FilePath -> Document -> IO ()
 compile filepath (Document t) = TextIO.writeFile filepath t
-
-stdoutWith :: (Monad m) => (m Document -> IO Document) -> m Document -> IO ()
-stdoutWith runner mdoc = do
-  Document t <- runner mdoc
-  TextIO.putStrLn t
-
-stdout :: Document -> IO ()
-stdout (Document t) = TextIO.putStrLn t
-
-splitM :: (Monoid a, Monad m) => [MathTextT m a] -> NormalTextT m a
-splitM = scopeM "align" . mscopeM "split" . helper
- where
-  helper [] = pure mempty
-  helper [x] = x
-  helper (x : y : xs) = do
-    a <- x
-    fromText " \\\\\n"
-    b <- helper $ y : xs
-    return $ a <> b
-
-split :: (Monad m) => [MathTextT m ()] -> NormalTextT m ()
-split = splitM
-
-figureM :: (Monoid a, Monad m) => Text -> Text -> Text -> NormalTextT m a
-figureM arg scale filename =
-  scopeWithM arg "figure" $
-    command "centering"
-      >> (commandM "includegraphics" ?> textM ("scale=" <> scale) .> textM filename)
-
-figure :: (Monad m) => Text -> Text -> Text -> NormalTextT m ()
-figure = figureM
