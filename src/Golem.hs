@@ -72,10 +72,10 @@ module Golem (
   figure,
 ) where
 
+import Control.Applicative (liftA2)
 import Control.Monad.Identity (Identity, runIdentity)
 import Control.Monad.Trans (MonadTrans (..))
 import Control.Monad.Trans.Writer.Strict (WriterT (..), runWriterT)
-import Control.Monad.Writer.Strict (MonadWriter (..))
 import Data.Bifunctor (second)
 import Data.Text (Text, unpack)
 import Data.Text.IO as TextIO
@@ -87,16 +87,6 @@ type MathText' = NormalText ()
 type MathText a = MathTextT Identity a
 newtype MathTextT m a = MathTextT {unMathTextT :: WriterT Text m a}
 newtype Document = Document {unDocument :: Text}
-
-instance (Monad m) => MonadWriter Text (NormalTextT m) where
-  writer = NormalTextT . writer
-  listen = NormalTextT . listen . unNormalTextT
-  pass = NormalTextT . pass . unNormalTextT
-
-instance (Monad m) => MonadWriter Text (MathTextT m) where
-  writer = MathTextT . writer
-  listen = MathTextT . listen . unMathTextT
-  pass = MathTextT . pass . unMathTextT
 
 instance (Functor m) => Functor (NormalTextT m) where
   fmap f (NormalTextT w) = NormalTextT $ fmap f w
@@ -183,17 +173,17 @@ infixl 4 ?>
 t ?> x = t <> fromTextM "[" <> cast x <> fromTextM "]"
 
 -- Separate two texts with something
-putBetween :: (Monoid a, Applicative m, TextPack t m, Semigroup (t m a)) => Text -> t m a -> t m a -> t m a
+putBetween :: (Monoid a, Applicative m, Applicative (t m), TextPack t m, Semigroup (t m a)) => Text -> t m a -> t m a -> t m a
 putBetween phrase a b = a <> fromTextM phrase <> b
 
 -- Space between
 infixl 3 #
-(#) :: (Monoid a, Applicative m, TextPack t m, Semigroup (t m a)) => t m a -> t m a -> t m a
+(#) :: (Monoid a, Applicative m, Applicative (t m), TextPack t m, Semigroup (t m a)) => t m a -> t m a -> t m a
 (#) = putBetween " "
 
 -- Nothing between
 infixl 3 ><
-(><) :: (Monoid a, Applicative m, TextPack t m, Semigroup (t m a)) => t m a -> t m a -> t m a
+(><) :: (Monoid a, Applicative m, Applicative (t m), TextPack t m, Semigroup (t m a)) => t m a -> t m a -> t m a
 (><) = putBetween ""
 
 infix 4 &>
@@ -226,16 +216,16 @@ mcommand :: (Applicative m) => Text -> MathTextT m ()
 mcommand = mcommandM
 
 -- New line
-newL :: (MonadWriter Text m) => m ()
-newL = tell "\n"
+newL :: (Applicative m, TextPack t m) => t m ()
+newL = fromText "\n"
 
 -- Double new line in NormalTextT, but new line in MathTextT
-newP :: (Applicative m, TextPack t m, Semigroup (t m ()), MonadWriter Text (t m), GolemText t) => t m ()
+newP :: (Applicative m, Applicative (t m), TextPack t m, Semigroup (t m ()), GolemText t) => t m ()
 newP = pure () % pure ()
 
 infixl 3 %
 class GolemText t where
-  (%) :: (Monoid a, Applicative m, TextPack t m, Semigroup (t m a)) => t m a -> t m a -> t m a
+  (%) :: (Monoid a, Applicative m, Applicative (t m), TextPack t m, Semigroup (t m a)) => t m a -> t m a -> t m a
   fromWriterT :: WriterT Text m a -> t m a
   toWriterT :: t m a -> WriterT Text m a
   runTextT :: t m a -> m (a, Text)
@@ -272,7 +262,7 @@ fromMath = fromMathM
 
 -- Inline math
 inlineM :: (Monad m) => MathTextT m a -> NormalTextT m a
-inlineM t = tell "$" &> cast t <& tell "$"
+inlineM t = fromTextM "$" &> cast t <& fromTextM "$"
 
 inline :: (Monad m) => MathTextT m () -> NormalTextT m ()
 inline = inlineM
@@ -409,7 +399,7 @@ splitM = scopeM "align" . mscopeM "split" . helper
   helper [x] = x
   helper (x : y : xs) = do
     a <- x
-    tell " \\\\\n"
+    fromText " \\\\\n"
     b <- helper $ y : xs
     return $ a <> b
 
